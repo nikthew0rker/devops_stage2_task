@@ -261,7 +261,41 @@ Pipeline GitHub Actions выполняет:
 
 ------------------------------------------------------------------------
 
-## Как развивал бы дальше для production / HA
+## Остановка
+
+Остановить стек:
+
+``` bash
+docker compose down
+```
+
+Остановить стек и удалить volumes:
+
+``` bash
+docker compose down -v
+```
+
+
+## Частые проблемы
+
+### PostgreSQL не стартует с ошибкой 
+`POSTGRES_PASSWORD is not specified`
+
+Проверьте, что в корне проекта создан `.env` файл и в нём задан непустой `POSTGRES_PASSWORD`.
+
+Пример:
+
+```env
+POSTGRES_PASSWORD=change_me
+GRAFANA_ADMIN_USER=admin
+GRAFANA_ADMIN_PASSWORD=admin
+
+
+------------------------------------------------------------------------
+
+------------------------------------------------------------------------
+
+# Как развивал бы дальше для production / HA
 
 1. Перенёс бы deployment с Docker Compose на Kubernetes + Helm, чтобы получить декларативный rollout, управление конфигурацией по окружениям и более удобную эксплуатацию.
 
@@ -402,33 +436,3 @@ helm/app/
 
 
 ------------------------------------------------------------------------
- 
-
-## Остановка
-
-Остановить стек:
-
-``` bash
-docker compose down
-```
-
-Остановить стек и удалить volumes:
-
-``` bash
-docker compose down -v
-```
-
-
-## Частые проблемы
-
-### PostgreSQL не стартует с ошибкой 
-`POSTGRES_PASSWORD is not specified`
-
-Проверьте, что в корне проекта создан `.env` файл и в нём задан непустой `POSTGRES_PASSWORD`.
-
-Пример:
-
-```env
-POSTGRES_PASSWORD=change_me
-GRAFANA_ADMIN_USER=admin
-GRAFANA_ADMIN_PASSWORD=admin
