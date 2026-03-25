@@ -289,7 +289,7 @@ docker compose down -v
 POSTGRES_PASSWORD=change_me
 GRAFANA_ADMIN_USER=admin
 GRAFANA_ADMIN_PASSWORD=admin
-
+```
 
 ------------------------------------------------------------------------
 
