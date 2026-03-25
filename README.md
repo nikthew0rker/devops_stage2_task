@@ -263,19 +263,146 @@ Pipeline GitHub Actions выполняет:
 
 ## Как развивал бы дальше для production / HA
 
-1.  Перенёс бы deployment с Docker Compose на Kubernetes + Helm.
-2.  Использовал бы managed PostgreSQL или PostgreSQL HA-решение.
-3.  Вынес бы backup в object storage с retention policy и регулярными
-    restore-тестами.
-4.  Перевёл бы секреты во внешний secret manager.
-5.  Добавил бы ingress + TLS.
-6.  Добавил бы alerting через Prometheus rules + Alertmanager.
-7.  Добавил бы централизованные логи и tracing.
-8.  Ввёл бы resource requests/limits и дополнительные меры hardening.
-9.  Вынес бы миграции БД в отдельный lifecycle step.
-10. Усилил бы CI проверками безопасности и сканированием образов.
+1. Перенёс бы deployment с Docker Compose на Kubernetes + Helm, чтобы получить декларативный rollout, управление конфигурацией по окружениям и более удобную эксплуатацию.
+
+2. Использовал бы managed PostgreSQL или PostgreSQL HA-решение с автоматическим failover, backup policy и регулярной проверкой восстановления.
+
+3. Вынес бы backup в object storage с retention policy, версионированием и регулярными restore-тестами в отдельном контуре.
+
+4. Перевёл бы секреты во внешний secret manager и убрал бы чувствительные значения из `.env` и runtime-конфигурации контейнеров.
+
+5. Добавил бы ingress + TLS, базовую сетевую сегментацию и контроль внешнего доступа.
+
+6. Добавил бы alerting через Prometheus rules + Alertmanager с разделением на warning / critical и маршрутизацией уведомлений.
+
+7. Добавил бы централизованные логи и tracing для диагностики ошибок, деградации производительности и анализа запросов.
+
+8. Ввёл бы resource requests/limits, probes и дополнительные меры hardening:
+   - запуск от non-root пользователя
+   - read-only filesystem
+   - минимальные capabilities
+   - pinning образов по digest
+
+9. Вынес бы миграции БД в отдельный lifecycle step (job / init container / migration service), чтобы не связывать изменение схемы со стартом приложения.
+
+10. Усилил бы CI/CD:
+    - image scanning
+    - dependency scanning
+    - secret scanning
+    - policy checks (OPA / Kyverno)
+    - lint Helm chart'ов
+
+11. Для observability в Kubernetes использовал бы operator-based подход:
+    - **Prometheus Operator** — управление Prometheus, Alertmanager, ServiceMonitor, PodMonitor, PrometheusRule через CRD;
+    - **Grafana Operator** — управление Grafana instances, dashboards и datasources декларативно;
+    - отказ от ручной настройки через UI в пользу GitOps-подхода.
+
+12. Добавил бы полноценный CI/CD pipeline с деплоем в Kubernetes через Helm и выбором окружения (`dev` / `stage` / `prod`):
+    - сборка и push образа
+    - тестирование
+    - выбор values-файла
+    - `helm upgrade --install`
+    - post-deploy проверки
+    - rollback при неуспехе
+
+---
+
+### Ключевые метрики для production
+
+### Метрики приложения
+- `app_requests_total` — общее количество запросов
+- RPS (`rate(app_requests_total)`)
+- latency (p50 / p95 / p99)
+- error rate (доля 5xx)
+- success rate по endpoint'ам
+- количество активных запросов (in-flight)
+- количество рестартов приложения
+
+### Метрики PostgreSQL
+- активные соединения
+- latency запросов
+- slow queries
+- deadlocks
+- replication lag (если есть реплики)
+- размер БД и рост таблиц
+- WAL / checkpoint активность
+- статус и возраст последнего backup
+
+### Метрики Kubernetes / инфраструктуры
+- CPU / memory usage по pod / node
+- restart count контейнеров
+- OOMKilled события
+- pod readiness / availability
+- node pressure (memory / disk)
+- disk usage и IOPS
+- network errors / packet loss
+
+### Метрики observability и delivery
+- scrape success / target health в Prometheus
+- alert delivery success rate
+- deployment frequency
+- lead time for changes
+- failed deployment rate
+- mean time to recovery (MTTR)
+
+---
+
+### Как выглядел бы CI/CD pipeline
+
+Pipeline разбивается на стадии:
+
+### 1. Validate / Lint
+- docker compose config
+- helm lint
+- yaml lint
+- проверка структуры проекта
+
+### 2. Build
+- сборка Docker image
+- tagging (commit SHA / release)
+- push в registry
+
+### 3. Test
+- smoke tests
+- проверка `/health`
+- проверка `/metrics`
+- e2e через docker compose
+- тест backup script
+
+### 4. Security
+- image scanning
+- dependency scanning
+- secret scanning
+
+### 5. Deploy
+- выбор окружения: `dev` / `stage` / `prod`
+- выбор values-файла Helm
+- `helm upgrade --install`
+- ожидание rollout (`kubectl rollout status`)
+- post-deploy smoke tests
+- rollback при ошибке
+
+---
+
+### Стратегия деплоя по окружениям
+
+- `dev` — автоматический деплой при push
+- `stage` — деплой после merge / manual approval
+- `prod` — только manual approval или release tag
+
+Пример структуры:
+
+```text
+helm/app/
+  values-dev.yaml
+  values-stage.yaml
+  values-prod.yaml
+```
+
+
 
 ------------------------------------------------------------------------
+ 
 
 ## Остановка
 
