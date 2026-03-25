@@ -1,0 +1,75 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create env file
+        run: cp .env.example .env
+
+      - name: Validate docker compose
+        run: docker compose config
+
+      - name: Build services
+        run: docker compose build
+
+      - name: Start stack
+        run: docker compose up -d
+
+      - name: Wait for app health
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/health >/dev/null; then
+              echo "Application is healthy"
+              break
+            fi
+            sleep 2
+          done
+
+          curl -fsS http://localhost:8000/health >/dev/null || {
+            echo "Application did not become healthy in time"
+            docker compose ps
+            docker compose logs
+            exit 1
+          }
+
+      - name: Warm up application
+        run: |
+          curl -fsS http://localhost:8000/ >/dev/null
+          curl -fsS http://localhost:8000/ >/dev/null
+
+      - name: Check metrics endpoint
+        run: |
+          curl -fsS http://localhost:8000/metrics | grep app_requests_total
+          curl -fsS http://localhost:8000/metrics | grep app_request_duration_seconds
+
+      - name: Check Prometheus API
+        run: |
+          for i in $(seq 1 20); do
+            if curl -fsS "http://localhost:9090/api/v1/query?query=app_requests_total" | grep -q '"status":"success"'; then
+              echo "Prometheus API is available"
+              break
+            fi
+            sleep 2
+          done
+
+          curl -fsS "http://localhost:9090/api/v1/query?query=app_requests_total" | grep '"status":"success"'
+
+      - name: Test backup script
+        run: |
+          chmod +x scripts/backup.sh scripts/restore.sh
+          ./scripts/backup.sh
+          test -n "$(find backups -type f -name '*.sql' | head -n 1)"
+
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v
